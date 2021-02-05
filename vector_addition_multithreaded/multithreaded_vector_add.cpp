@@ -2,9 +2,9 @@
 #include <thread>
 #include <benchmark/benchmark.h>
 
-typedef unsigned long long int sum_st;
-typedef std::atomic<unsigned long long int> sum_mt;
-typedef std::vector<unsigned int> vec_type;
+using sum_st = unsigned long long int;
+using sum_mt = std::atomic<unsigned long long int>;
+using vec_type = std::vector<unsigned int>;
 
 struct Args {
     int tid, THREADS;
