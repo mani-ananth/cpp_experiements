@@ -1,15 +1,16 @@
 #include <bits/stdc++.h>
 #include <thread>
 #include <benchmark/benchmark.h>
-#include <mutex>
 
 using sum_st = unsigned long long int;
 using sum_mt = std::atomic<unsigned long long int>;
 using vec_type = std::vector<unsigned int>;
+using vector_of_threads = std::vector<std::thread>;
 
 struct Args {
     int tid, THREADS;
     std::reference_wrapper<vec_type> v;
+	sum_st ref_sum;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -32,14 +33,13 @@ auto vector_add_BM_ST = [](benchmark::State &state, Args &args) {
         sum_st sum = 0;
         vector_add_ST(args.v, sum, args.tid, args.THREADS);
         std::cout << "Sum = " << sum << " computed across by single thread\n";
+		assert(args.ref_sum == sum);
     }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////               Multi Threaded Implementation               ////////////
 ////////////////////////////////////////////////////////////////////////////////
-
-std::mutex mu;
 
 void vector_add_MT(vec_type &v, sum_mt &sum, int tid, int THREADS) {
     auto TOTAL = v.size();
@@ -50,22 +50,22 @@ void vector_add_MT(vec_type &v, sum_mt &sum, int tid, int THREADS) {
     for (auto i = start; i < end; i++) {
         local_sum += v[i];
     }
-    mu.
     sum += local_sum;
-    printf("tid %d: local_sum = %d", tid, local_sum);
+    printf("tid %d: local_sum = %u", tid, local_sum);
     std::cout << " sum = " << sum << std::endl;
 }
 
 auto vector_add_BM_MT = [](benchmark::State &state, Args &args) {
     while (state.KeepRunning()) {
         sum_mt sum;
-        if (state.thread_index == 0) {
-            sum = 0;
-        }
-        vector_add_MT(args.v, sum, state.thread_index, args.THREADS);
-        if (state.thread_index == 0) {
-            std::cout << "Sum = " << sum << " computed across " << args.THREADS << " threads\n";
-        }
+        sum = 0;
+		vector_of_threads threads;
+		for (auto i=0; i < args.THREADS; ++i)
+		    threads.emplace_back(std::thread(vector_add_MT, std::ref(args.v), std::ref(sum), i, args.THREADS));
+		for (auto &t : threads)
+		    t.join();
+        std::cout << "Sum = " << sum.load() << " computed across " << args.THREADS << " threads\n";
+		assert(args.ref_sum == sum.load());
     }
 };
 
@@ -89,30 +89,29 @@ int main(int argc, char **argv) {
         return rand() % 5;
     });
 
-    {
-        // Reference code
-        sum_st sum = 0;
-        vector_add_ST(v, sum, 0, 1);
-        std::cout << "Reference: Sum = " << sum << std::endl;
-        std::cout << "Reference: Values = ";
-        for (auto &i : v)
-            std:: cout << i << " ";
-        std::cout << std::endl;
-    }
-
+    // Reference code
+    sum_st ref_sum = 0;
+    vector_add_ST(v, ref_sum, 0, 1);
+    std::cout << "Reference: Sum = " << ref_sum << std::endl;
+    // std::cout << "Reference: Values = ";
+    // for (auto &i : v)
+    //     std:: cout << i << " ";
+    // std::cout << std::endl;
+	
+	// Actual
     if (mode == 1) {
-        Args args{0, 1, std::ref(v)};
+        Args args{0, 1, std::ref(v), ref_sum};
         benchmark::RegisterBenchmark("Single Threaded Vec Add", vector_add_BM_ST, std::ref(args)) \
             -> Unit(benchmark::kMillisecond) \
             -> Iterations(5);
         benchmark::Initialize(&argc, argv);
         benchmark::RunSpecifiedBenchmarks();
     } else if (mode == 2) {
-        Args args{0/*doesnt matter*/, nthreads, std::ref(v)};
+        Args args{0/*doesnt matter*/, nthreads, std::ref(v), ref_sum};
         benchmark::RegisterBenchmark("Multi Threaded Vec Add", vector_add_BM_MT, std::ref(args)) \
             -> Unit(benchmark::kMillisecond) \
             -> Iterations(5) \
-            -> Threads(nthreads);
+			-> UseRealTime();
         benchmark::Initialize(&argc, argv);
         benchmark::RunSpecifiedBenchmarks();
     } else if (mode == 3) {
