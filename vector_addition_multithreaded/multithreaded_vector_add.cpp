@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include <thread>
 #include <benchmark/benchmark.h>
+#include <mutex>
 
 typedef unsigned long long int sum_st;
 typedef std::atomic<unsigned long long int> sum_mt;
@@ -38,6 +39,8 @@ auto vector_add_BM_ST = [](benchmark::State &state, Args &args) {
 /////////               Multi Threaded Implementation               ////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+std::mutex mu;
+
 void vector_add_MT(vec_type &v, sum_mt &sum, int tid, int THREADS) {
     auto TOTAL = v.size();
     auto per_thread = (long unsigned int)(ceil(TOTAL * 1.0 / THREADS));
@@ -47,7 +50,10 @@ void vector_add_MT(vec_type &v, sum_mt &sum, int tid, int THREADS) {
     for (auto i = start; i < end; i++) {
         local_sum += v[i];
     }
+    mu.
     sum += local_sum;
+    printf("tid %d: local_sum = %d", tid, local_sum);
+    std::cout << " sum = " << sum << std::endl;
 }
 
 auto vector_add_BM_MT = [](benchmark::State &state, Args &args) {
@@ -82,6 +88,17 @@ int main(int argc, char **argv) {
     std::generate(v.begin(), v.end(), [](){
         return rand() % 5;
     });
+
+    {
+        // Reference code
+        sum_st sum = 0;
+        vector_add_ST(v, sum, 0, 1);
+        std::cout << "Reference: Sum = " << sum << std::endl;
+        std::cout << "Reference: Values = ";
+        for (auto &i : v)
+            std:: cout << i << " ";
+        std::cout << std::endl;
+    }
 
     if (mode == 1) {
         Args args{0, 1, std::ref(v)};
